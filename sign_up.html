@@ -92,7 +92,7 @@
                 return
             }
             $.post('/sign_up', hash).then((e) => {
-                console.log(e)
+               window.location.href='http://localhost:8080/sign_in'
             }, (request) => {
                 let obj = JSON.parse(request.responseText)
                 let {errors} = obj

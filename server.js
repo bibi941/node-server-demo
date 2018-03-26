@@ -2,6 +2,7 @@ var http = require('http')
 var fs = require('fs')
 var url = require('url')
 var port = process.argv[2]
+var session = {}
 
 if (!port) {
     console.log('请指定端口号好不啦？\n node server.js 8888 这样不会吗？')
@@ -24,41 +25,48 @@ var server = http.createServer(function(request, response) {
     console.log('方方说：含查询字符串的路径\n' + pathWithQuery)
 
     if (path === '/') {
-    let string = fs.readFileSync('./index.html', 'utf8')
-    let cookies =  request.headers.cookie.split('; ') // ['email=1@', 'a=1', 'b=2']
-    let hash = {}
-    for(let i =0;i<cookies.length; i++){
-      let parts = cookies[i].split('=')
-      let key = parts[0]
-      let value = parts[1]
-      hash[key] = value 
-    }
-    let email = hash.sign_in_email
-    let users = fs.readFileSync('./user.json', 'utf8')
-    users = JSON.parse(users)
-    let foundUser
-    for(let i=0; i< users.length; i++){
-      if(users[i].email === email){
-        foundUser = users[i]
-        break
-      }
-    }
-    console.log(foundUser)
-    if(foundUser){
-      string = string.replace('__password__', foundUser.password)
-    }else{
-      string = string.replace('__password__', '不知道')
-    }
-    response.statusCode = 200
-    response.setHeader('Content-Type', 'text/html;charset=utf-8')
-    response.write(string)
-    response.end()
-  }else if(path === '/sign_up' && method === 'GET'){ 
-    let string = fs.readFileSync('./sign_up.html', 'utf8')
-    response.statusCode = 200
-    response.setHeader('Content-Type', 'text/html;charset=utf-8')
-    response.write(string)
-    response.end()
+        let string = fs.readFileSync('./index.html', 'utf8')
+        let cookies=' '
+        if (request.headers.cookie) {
+            cookies = request.headers.cookie.split('; ') // ['email=1@', 'a=1', 'b=2']
+        }
+        let hash = {}
+        for (let i = 0; i < cookies.length; i++) {
+            let parts = cookies[i].split('=')
+            let key = parts[0]
+            let value = parts[1]
+            hash[key] = value
+        }
+        let mySession=session[hash.sessionId]
+        let email
+        if (mySession) {
+            email=mySession.sign_in_email
+        }
+        console.log(session)
+        let users = fs.readFileSync('./user.json', 'utf8')
+        users = JSON.parse(users)
+        let foundUser
+        for (let i = 0; i < users.length; i++) {
+            if (users[i].email === email) {
+                foundUser = users[i]
+                break
+            }
+        }
+        if (foundUser) {
+            string = string.replace('__password__', foundUser.password)
+        } else {
+            string = string.replace('__password__', '不知道')
+        }
+        response.statusCode = 200
+        response.setHeader('Content-Type', 'text/html;charset=utf-8')
+        response.write(string)
+        response.end()
+    } else if (path === '/sign_up' && method === 'GET') {
+        let string = fs.readFileSync('./sign_up.html', 'utf8')
+        response.statusCode = 200
+        response.setHeader('Content-Type', 'text/html;charset=utf-8')
+        response.write(string)
+        response.end()
     } else if (path === '/sign_in' && method === 'GET') {
         let string = fs.readFileSync('./sign_in.html', 'utf8')
         response.statusCode = 200
@@ -66,6 +74,7 @@ var server = http.createServer(function(request, response) {
         response.write(string)
         response.end()
     } else if (path === '/sign_in' && method === 'POST') {
+        //登录
         readBody(request).then(body => {
             let strings = body.split('&')
             let hash = {}
@@ -93,11 +102,9 @@ var server = http.createServer(function(request, response) {
                 }
             }
             if (found) {
-                //'Set-Cookie: <cookie-name>=<cookie-value> '
-                response.setHeader(
-                    `Set-Cookie`,
-                    `sign_in_email=${email};HttpOnly`
-                )
+                let sessionId = Math.random() * 100000
+                session[sessionId] = { sign_in_email: email }
+                response.setHeader(`Set-Cookie`, `sessionId=${sessionId}`)
                 response.statusCode = 200
             } else {
                 response.statusCode = 401
